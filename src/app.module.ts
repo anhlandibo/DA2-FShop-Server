@@ -9,6 +9,7 @@ import { APP_INTERCEPTOR, APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { AllExceptionFilter } from './filters/all-exception.filter';
 import { TransformInterceptor } from './interceptors/transform.interceptor';
 import { StartTimingMiddleware } from './middlewares/start-timing.middleware';
+import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { StartTimingMiddleware } from './middlewares/start-timing.middleware';
       useFactory: getDatabaseConfig,
     }),
     UsersModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [
