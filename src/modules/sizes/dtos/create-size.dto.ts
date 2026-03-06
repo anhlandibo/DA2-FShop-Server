@@ -1,20 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
-import { SizeType } from 'src/constants/size-type.enum';
-import { StringRequired, StringOptional } from 'src/decorators/dto.decorator';
+import { IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { NumberOptional, NumberRequired, StringRequired } from 'src/decorators/dto.decorator';
 
 export class CreateSizeDto {
   @StringRequired('Size name')
   @ApiProperty({ example: 'M' })
   name: string;
 
-  @IsOptional()
-  @IsEnum(SizeType)
-  @ApiProperty({ enum: SizeType, default: SizeType.CLOTHING, example: SizeType.CLOTHING, required: false })
-  type?: SizeType;
+  @NumberRequired('Size type ID')
+  @ApiProperty({ example: 1, description: 'Size type ID' })
+  sizeTypeId: number;
 
-  @IsOptional()
-  @IsNumber()
+  @NumberOptional()
   @ApiProperty({ example: 0, required: false })
   sortOrder?: number;
 }
