@@ -53,10 +53,13 @@ export class UsersService {
   async findByEmail(email: string) {
     const user = await this.usersRepository.findOne({
       where: { email },
-      relations: ['cart'],
     });
     if (!user) throw new HttpException('Not found user', HttpStatus.NOT_FOUND);
     return user;
+  }
+
+  async updatePassword(id: number, hashedPassword: string) {
+    await this.usersRepository.update(id, { password: hashedPassword });
   }
 
   async findById(id: number) {
