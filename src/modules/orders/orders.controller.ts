@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiNotFoundResponse, ApiBadRequestResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -68,19 +68,26 @@ export class OrdersController {
   @Patch(':id/status')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update order status' })
   @ApiNotFoundResponse({ description: 'Order not found' })
+  @ApiBadRequestResponse({ description: 'Invalid status transition' })
   updateOrderStatus(
     @Req() req: any,
     @Param('id') id: number,
     @Body() dto: UpdateOrderStatusDto,
   ) {
+    if (!req.user || !req.user.role) {
+      throw new HttpException('Unable to extract user role from token', HttpStatus.UNAUTHORIZED);
+    }
+
     const actor = {
-      id: req['user'].sub,
-      role: req['user'].role as ActorRole,
-      reason: dto['reason'],
+      id: req.user.sub,
+      role: (req.user.role as string).toLowerCase() as ActorRole,
+      reason: dto.reason,
     };
+
     return this.ordersService.updateStatus(id, dto.status, actor);
   }
 
