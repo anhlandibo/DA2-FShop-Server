@@ -5,7 +5,7 @@ import { StringRequired } from 'src/decorators/dto.decorator';
 export class LoginDto {
   @StringRequired('Email')
   @IsEmail({}, { message: 'Email is invalid' })
-  @ApiProperty({ example: 'nguyenvana@gmail.com', description: 'User email' })
+  @ApiProperty({ example: 'admin@gmail.com', description: 'User email' })
   email: string;
 
   @StringRequired('Password')

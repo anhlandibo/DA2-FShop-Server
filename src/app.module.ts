@@ -24,6 +24,7 @@ import { WishlistsModule } from './modules/wishlists/wishlists.module';
 import { CartsModule } from './modules/carts/carts.module';
 import { InventoriesModule } from './modules/inventories/inventories.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     CartsModule,
     InventoriesModule,
     OrdersModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [

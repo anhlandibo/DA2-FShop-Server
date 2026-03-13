@@ -17,7 +17,7 @@ export class CreateUserDto {
     password: string
 
     @IsEnum(Role)
-    @ApiProperty({enum: Role, default: Role.USER, example: Role.USER})
+    @ApiProperty({enum: Role, default: Role.ADMIN, example: Role.ADMIN})
 
     role: Role;
 

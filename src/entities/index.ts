@@ -18,3 +18,4 @@ export { ProductImage } from '../modules/products/entities/product-image.entity'
 export { ProductVariant } from '../modules/products/entities/product-variant.entity';
 export { Inventory, InventoryTransaction } from '../modules/inventories/entities';
 export { Order, OrderItem } from '../modules/orders/entities';
+export { Coupon, CouponRedemption } from '../modules/coupons/entities';
