@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { seedUsers } from './users.seeder';
 import { seedBrands } from './brands.seeder';
 import { seedCategories } from './categories.seeder';
 import { seedColors } from './colors.seeder';
@@ -10,6 +11,7 @@ import { Brand } from '../modules/brands/entities/brand.entity';
 import { Category } from '../modules/categories/entities/category.entity';
 import { Color } from '../modules/colors/entities/color.entity';
 import { Size } from '../modules/sizes/entities/size.entity';
+import { User } from '../modules/users/entities/user.entity';
 
 /**
  * Clear all data in reverse order of FK dependencies
@@ -18,6 +20,7 @@ import { Size } from '../modules/sizes/entities/size.entity';
 async function clearAllData(dataSource: DataSource): Promise<void> {
   try {
     // Clear in reverse order of FK dependencies
+    const userRepo = dataSource.getRepository(User);
     const brandRepo = dataSource.getRepository(Brand);
     const categoryRepo = dataSource.getRepository(Category);
     const colorRepo = dataSource.getRepository(Color);
@@ -25,6 +28,7 @@ async function clearAllData(dataSource: DataSource): Promise<void> {
 
     console.log('🗑️  Clearing existing data...');
     
+    await userRepo.createQueryBuilder().delete().execute();
     await brandRepo.createQueryBuilder().delete().execute();
     await categoryRepo.createQueryBuilder().delete().execute();
     await colorRepo.createQueryBuilder().delete().execute();
@@ -53,6 +57,8 @@ async function runSeed() {
     await clearAllData(AppDataSource);
 
     // Run seeders in order (respecting foreign key dependencies)
+    // Users first since they have no dependencies
+    await seedUsers(AppDataSource);
     await seedBrands(AppDataSource);
     await seedCategories(AppDataSource);
     await seedColors(AppDataSource);

@@ -4,3 +4,6 @@ export * from './role.enum';
 export * from './shipping-method.enum';
 export * from './department-type.enum'
 export * from './inventory-type.enum';
+export * from './coupon-type.enum';
+export * from './coupon-status.enum';
+export * from './redemption-status.enum';
