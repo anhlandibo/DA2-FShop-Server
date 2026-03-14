@@ -9,19 +9,23 @@ import {
   Post,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto } from './dtos';
+import { ChangePasswordDto, LoginDto, UpdateMeDto } from './dtos';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/decorators/current-user.decorator';
 import type { JwtPayload } from 'src/strategies/jwt.strategy';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -77,6 +81,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   async getMe(@CurrentUser() user: JwtPayload) {
     return this.authService.getMe(user.sub);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('avatar'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update current authenticated user profile' })
+  async updateMe(
+    @CurrentUser() user: JwtPayload,
+    @Body() updateMeDto: UpdateMeDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.authService.updateMe(user.sub, updateMeDto, file);
   }
 
   @Patch('change-password')

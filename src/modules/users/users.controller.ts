@@ -9,8 +9,6 @@ import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { Roles } from 'src/decorators/roles.decorator';
 import { Role } from 'src/constants/role.enum';
-import { CurrentUser } from 'src/decorators/current-user.decorator';
-import type { JwtPayload } from 'src/strategies/jwt.strategy';
 
 @Controller('users')
 export class UsersController {
@@ -36,7 +34,8 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('avatar'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user (admin only)' })
@@ -51,7 +50,8 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete user (admin only)' })
   @ApiNotFoundResponse({ description: 'User not found' })

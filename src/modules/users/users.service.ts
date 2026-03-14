@@ -12,6 +12,11 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 import { CartsService } from '../carts/carts.service';
 
 
+type UpdateOwnProfileInput = {
+  fullName?: string;
+  email?: string;
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -132,6 +137,47 @@ export class UsersService {
       existingUser.avatar = uploaded?.secure_url;
       existingUser.publicId = uploaded?.public_id;
     }
+    return this.usersRepository.save(existingUser);
+  }
+
+  async updateOwnProfile(
+    id: number,
+    updateProfileDto: UpdateOwnProfileInput,
+    file?: Express.Multer.File,
+  ) {
+    const existingUser = await this.usersRepository.findOne({
+      where: { id, isActive: true },
+    });
+    if (!existingUser)
+      throw new HttpException('Not found user', HttpStatus.NOT_FOUND);
+
+    if (updateProfileDto.email) {
+      const existingEmail = await this.usersRepository.findOne({
+        where: { email: updateProfileDto.email },
+      });
+      if (existingEmail && existingEmail.id !== id)
+        throw new HttpException('Email exists', HttpStatus.CONFLICT);
+    }
+
+    if (typeof updateProfileDto.fullName !== 'undefined') {
+      existingUser.fullName = updateProfileDto.fullName;
+    }
+
+    if (typeof updateProfileDto.email !== 'undefined') {
+      existingUser.email = updateProfileDto.email;
+    }
+
+    if (file) {
+      if (existingUser.publicId) {
+        await this.cloudinaryService
+          .deleteFile(existingUser.publicId)
+          .catch(() => null);
+      }
+      const uploaded = await this.cloudinaryService.uploadFile(file);
+      existingUser.avatar = uploaded?.secure_url;
+      existingUser.publicId = uploaded?.public_id;
+    }
+
     return this.usersRepository.save(existingUser);
   }
 

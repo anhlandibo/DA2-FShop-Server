@@ -9,6 +9,7 @@ import { comparePassword, hashPassword } from 'src/utils/hash';
 import { Role } from 'src/constants/role.enum';
 import { LoginDto } from './dtos/login.dto';
 import { ChangePasswordDto } from './dtos/change-password.dto';
+import { UpdateMeDto } from './dtos/update-me.dto';
 
 @Injectable()
 export class AuthService {
@@ -113,6 +114,12 @@ export class AuthService {
 
   async getMe(userId: number) {
     const user = await this.usersService.findById(userId);
+    const { password: _password, publicId: _publicId, ...userInfo } = user;
+    return userInfo;
+  }
+
+  async updateMe(userId: number, dto: UpdateMeDto, file?: Express.Multer.File) {
+    const user = await this.usersService.updateOwnProfile(userId, dto, file);
     const { password: _password, publicId: _publicId, ...userInfo } = user;
     return userInfo;
   }
