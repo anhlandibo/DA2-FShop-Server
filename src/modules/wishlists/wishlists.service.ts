@@ -11,13 +11,18 @@ export class WishlistsService {
     private wishlistsRepository: Repository<Wishlist>,
     @InjectDataSource() private dataSource: DataSource,
     @InjectRepository(User) private userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   async getMyWishlists(userId: number) {
     console.log(userId);
     const wishlists = await this.wishlistsRepository.find({
       where: { user: { id: userId } },
-      relations: ['product.variants', 'product.images'],
+      relations: [
+        'product.variants',
+        'product.images',
+        'product.brand',
+        'product.category',
+      ],
     });
     return wishlists;
   }

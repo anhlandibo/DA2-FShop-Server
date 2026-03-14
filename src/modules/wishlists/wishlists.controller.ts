@@ -6,14 +6,14 @@ import { CreateWishlistsDto } from './dtos/create-wishlits.dto';
 
 @Controller('wishlists')
 export class WishlistsController {
-  constructor(private readonly wishlistsService: WishlistsService) {}
+  constructor(private readonly wishlistsService: WishlistsService) { }
   @UseGuards(AuthGuard('jwt'))
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my wishlists' })
   async getAll(@Req() req: Request) {
-    const { id } = req['user'];
-    return this.wishlistsService.getMyWishlists(id);
+    const { sub } = req['user'];
+    return this.wishlistsService.getMyWishlists(sub);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -26,8 +26,8 @@ export class WishlistsController {
     @Req() req: Request,
     @Body() createWishlistDto: CreateWishlistsDto,
   ) {
-    const { id } = req['user'];
-    return this.wishlistsService.toggle(id, createWishlistDto);
+    const { sub } = req['user'];
+    return this.wishlistsService.toggle(sub, createWishlistDto);
   }
 
   @Delete()
@@ -37,7 +37,7 @@ export class WishlistsController {
     summary: 'Clear all wishlist items for the authenticated user',
   })
   async removeAll(@Req() req: Request) {
-    const { id } = req['user'];
-    return this.wishlistsService.removeAll(id);
+    const { sub } = req['user'];
+    return this.wishlistsService.removeAll(sub);
   }
 }
