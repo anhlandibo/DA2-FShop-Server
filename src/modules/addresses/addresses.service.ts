@@ -68,10 +68,12 @@ export class AddressesService {
     return address;
   }
 
-  async delete(id: number) {
-    const address = await this.addressRepository.findOne({ where: { id, isActive: true } });
+  async delete(userId: number, id: number) {
+    const address = await this.addressRepository.findOne({
+      where: { id, isActive: true, user: { id: userId } },
+    });
     if (!address) throw new HttpException('Address not found', HttpStatus.NOT_FOUND);
-    await this.addressRepository.update({ id }, { isActive: false });
+    await this.addressRepository.update({ id, user: { id: userId } }, { isActive: false });
     return {
       message: 'Address soft deleted successfully',
       deletedId: id,

@@ -66,9 +66,12 @@ export class AddressesController {
     return this.addressService.setDefault(sub, id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Delete address by ID' })
-  delete(@Param('id') id: number) {
-    return this.addressService.delete(id);
+  delete(@Req() req: Request, @Param('id') id: number) {
+    const {sub} = req['user'];
+    return this.addressService.delete(sub, id);
   }
 }
