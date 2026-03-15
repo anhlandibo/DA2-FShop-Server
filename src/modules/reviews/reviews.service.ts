@@ -1,23 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review, ReviewImage, ReviewVote } from './entities';
 import { DataSource, Like, Repository } from 'typeorm';
-import { CreateReviewDto, VoteReviewDto } from './dtos';
+import { CreateReviewDto, UpdateReviewDto, VoteReviewDto } from './dtos';
 import { Order, Product, User } from 'src/entities';
 import { ProductVariant } from 'src/modules/products/entities/product-variant.entity';
 import { OrderStatus } from 'src/constants';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { plainToInstance } from 'class-transformer';
 import { QueryDto } from 'src/dtos';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class ReviewsService {
   constructor(
     @InjectRepository(Review) private reviewRepository: Repository<Review>,
-    @InjectRepository(ReviewImage) private reviewImageRepository: Repository<ReviewImage>,
-    @InjectRepository(ReviewVote) private reviewVoteRepository: Repository<ReviewVote>,
-    @InjectRepository(ProductVariant) private variantRepository: Repository<ProductVariant>,
+    @InjectRedis() private readonly redis: Redis,
     private dataSource: DataSource,
     private cloudinaryService: CloudinaryService,
   ) {}
@@ -171,5 +172,161 @@ export class ReviewsService {
         isHelpful: newNote.isHelpful,
       };
     })
+  }
+
+  async findByProduct(productId: number) {
+    const reviews = await this.reviewRepository
+      .createQueryBuilder('r')
+      .innerJoinAndSelect('r.variant', 'v')
+      .innerJoinAndSelect('r.user', 'u')
+      .leftJoinAndSelect('r.images', 'img')
+      .leftJoinAndSelect('r.votes', 'vote')
+      .where('v.product = :productId', { productId })
+      .andWhere('r.isActive = :isActive', { isActive: true })
+      .orderBy('r.createdAt', 'DESC')
+      .getMany();
+
+    return reviews.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      user: {
+        id: r.user.id,
+        name: r.user.fullName,
+      },
+      images: r.images.map((img) => img.imageUrl),
+      helpfulCount: r.votes.filter((v) => v.isHelpful).length,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async getReviewSummary(productId: number) {
+    const cachedKey = `review:summary:${productId}`;
+    const cached = await this.redis.get(cachedKey);
+
+    if (cached) return JSON.parse(cached);
+
+    const summary = await this.dataSource.transaction(async (manager) => {
+      const product = await manager.findOne(Product, {
+        where: { id: productId },
+      });
+      if (!product) throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
+
+      const results = await manager
+        .createQueryBuilder(Review, 'r')
+        .innerJoin('r.variant', 'v')
+        .select('ROUND(r.rating)', 'rating')
+        .addSelect('COUNT(r.id)', 'count')
+        .where('v.product = :productId', { productId })
+        .andWhere('r.isActive = :isActive', { isActive: true })
+        .groupBy('ROUND(r.rating)')
+        .getRawMany();
+
+      const total = results.reduce((sum, r) => sum + Number(r.count), 0);
+      const weightedSum = results.reduce(
+        (sum, r) => sum + Number(r.count) * Number(r.rating),
+        0,
+      );
+      const avg = total > 0 ? weightedSum / total : 0;
+
+      const distribution = Object.fromEntries(
+        [5, 4, 3, 2, 1].map((star) => [
+          star,
+          Number(results.find((r) => Number(r.rating) === star)?.count ?? 0),
+        ]),
+      );
+
+      return {
+        productId,
+        reviewCount: total,
+        averageRating: +avg.toFixed(1),
+        distribution,
+      };
+    });
+
+    // cache trong 5 mins
+    await this.redis.set(cachedKey, JSON.stringify(summary), 'EX', 60 * 5);
+    return summary;
+  }
+
+  async updateReview(
+    reviewId: number,
+    userId: number,
+    dto: UpdateReviewDto,
+    images: Array<Express.Multer.File>,
+  ) {
+    return await this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOne(User, { where: { id: userId, isActive: true } });
+      if (!user) throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+
+      const review = await manager.findOne(Review, {
+        where: { id: reviewId, isActive: true },
+        relations: ['variant', 'variant.product', 'images']
+      })
+      if (!review) throw new HttpException('Review not found', HttpStatus.NOT_FOUND)
+
+      if (dto.rating !== undefined) review.rating = dto.rating;
+      if (dto.comment !== undefined) review.comment = dto.comment;
+      await manager.save(review);
+
+      // xóa ảnh
+      if (review.images?.length) {
+        for (const img of review.images) {
+          if (img.publicId) {
+            try {
+              await this.cloudinaryService.deleteFile(img.publicId);
+            } catch {
+              /* empty */
+            }
+          }
+        }
+        await manager.delete(ReviewImage, { review: { id: review.id } });
+      }
+
+      if (images?.length > 0) {
+        const uploads = await Promise.all(
+          images.map((image) => this.cloudinaryService.uploadFile(image)),
+        );
+
+        const newImages = uploads.map((u) =>
+          manager.create(ReviewImage, {
+            review,
+            imageUrl: u?.secure_url,
+            publicId: u?.public_id,
+          }),
+        );
+
+        await manager.save(newImages);
+        review.images = newImages;
+      }
+      await this.updateProductRating(manager, review.variant.productId)
+      await this.redis.del(`review:summary:${review.variant.productId}`);
+
+      return {
+        ...review,
+        message: 'Review updated successfully',
+      };
+    });
+  }
+
+  async deleteReview(reviewId: number, userId: number) {
+    return await this.dataSource.transaction(async (manager) => {
+      const review = await manager.findOne(Review, {
+        where: { id: reviewId, user: { id: userId }, isActive: true },
+        relations: ['variant', 'variant.product'],
+      });
+
+      if (!review) throw new HttpException('Review not found or unauthorized', HttpStatus.NOT_FOUND);
+
+      // Soft delete: set isActive to false
+      review.isActive = false;
+      await manager.save(review);
+
+      // Cập nhật lại average rating của product (chỉ tính reviews active)
+      await this.updateProductRating(manager, review.variant.productId);
+      await this.redis.del(`review:summary:${review.variant.productId}`);
+
+      return { message: 'Review deleted successfully' };
+    });
   }
 }
