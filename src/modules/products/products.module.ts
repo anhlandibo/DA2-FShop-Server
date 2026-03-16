@@ -9,10 +9,12 @@ import { ColorsModule } from '../colors/colors.module';
 import { SizesModule } from '../sizes/sizes.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { CartItem } from '../carts/entities';
+import { InventoryTransaction } from '../inventories/entities/inventory-transaction.entity';
+import { Inventory } from '../inventories/entities/inventory.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, ProductImage, ProductVariant]),
+    TypeOrmModule.forFeature([Product, ProductImage, ProductVariant, InventoryTransaction, Inventory]),
     BrandsModule,
     CategoriesModule,
     ColorsModule,

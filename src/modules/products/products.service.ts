@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, ILike, In, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductImage } from './entities/product-image.entity';
 import { ProductVariant } from './entities/product-variant.entity';
@@ -11,6 +11,9 @@ import { BrandsService } from '../brands/brands.service';
 import { CategoriesService } from '../categories/categories.service';
 import { ColorsService } from '../colors/colors.service';
 import { SizesService } from '../sizes/sizes.service';
+import { InventoryTransaction } from '../inventories/entities/inventory-transaction.entity';
+import { Inventory } from '../inventories/entities/inventory.entity';
+import { InventoryType } from 'src/constants/inventory-type.enum';
 
 @Injectable()
 export class ProductsService {
@@ -21,6 +24,10 @@ export class ProductsService {
     private productImagesRepository: Repository<ProductImage>,
     @InjectRepository(ProductVariant)
     private productVariantsRepository: Repository<ProductVariant>,
+    @InjectRepository(InventoryTransaction)
+    private inventoryTransactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Inventory)
+    private inventoryRepository: Repository<Inventory>,
     private dataSource: DataSource,
     private brandsService: BrandsService,
     private categoriesService: CategoriesService,
@@ -139,11 +146,45 @@ export class ProductsService {
       order: { [sortBy]: sortOrder },
     });
 
-    // Filter images and variants by isActive
+    // Get product IDs for querying sold quantities
+    const productIds = data.map((p) => p.id);
+
+    // Query sold quantities for all products' variants
+    const soldQuantitiesByProduct: Record<number, number> = {};
+    if (productIds.length > 0) {
+      const variants = data.flatMap((p) =>
+        p.variants
+          ?.filter((v) => v.isActive)
+          .map((v) => ({ id: v.id, productId: p.id })) ?? [],
+      );
+
+      if (variants.length > 0) {
+        const variantIds = variants.map((v) => v.id);
+
+        // Query all EXPORT transactions for these variants
+        const soldData = await this.inventoryTransactionRepository.query(
+          `SELECT pv.product_id, COALESCE(SUM(it.quantity), 0) as sold_quantity
+           FROM inventory_transactions it
+           JOIN product_variants pv ON it.variant_id = pv.id
+           WHERE it.type = $1 AND pv.id = ANY($2)
+           GROUP BY pv.product_id`,
+          [InventoryType.EXPORT, variantIds],
+        );
+
+        // Map sold quantities by product ID
+        soldData.forEach((row: any) => {
+          soldQuantitiesByProduct[row.product_id] = parseInt(row.sold_quantity, 10);
+        });
+      }
+    }
+
+    // Filter images and variants by isActive and add stats
     const processedData = data.map((product) => ({
       ...product,
       images: product.images?.filter((img) => img.isActive) ?? [],
       variants: product.variants?.filter((v) => v.isActive) ?? [],
+      averageRating: product.averageRating || 0,
+      soldQuantity: soldQuantitiesByProduct[product.id] || 0,
     }));
 
     const response = {
@@ -166,12 +207,28 @@ export class ProductsService {
     if (!product) 
       throw new HttpException(`Product with id ${id} not found`, HttpStatus.NOT_FOUND);
     
+    // Get active variants
+    const activeVariants = product.variants?.filter((v) => v.isActive) ?? [];
+    
+    // Get stock quantities for all variants
+    const inventories = activeVariants.length > 0
+      ? await this.inventoryRepository.find({
+          where: { variantId: In(activeVariants.map((v) => v.id)) },
+        })
+      : [];
 
-    // Filter images and variants by isActive
+    const stockByVariant = Object.fromEntries(
+      inventories.map((inv) => [inv.variantId, inv.quantity]),
+    );
+
+    // Filter images and variants by isActive, add stock quantity
     return {
       ...product,
       images: product.images?.filter((img) => img.isActive) ?? [],
-      variants: product.variants?.filter((v) => v.isActive) ?? [],
+      variants: activeVariants.map((v) => ({
+        ...v,
+        stockQuantity: stockByVariant[v.id] ?? 0,
+      })),
     };
   }
 
