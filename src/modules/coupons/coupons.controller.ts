@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards, Req, Query, Get, Param, Patch, ParseIntPipe, Delete } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
-import { CreateCouponDto, UpdateCouponDto } from './dtos';
+import { CreateCouponDto, GetBestPublicCouponDto, UpdateCouponDto } from './dtos';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { Roles } from 'src/decorators/roles.decorator';
@@ -11,6 +11,61 @@ import { QueryCouponDto } from './dtos/query-coupon.dto';
 @Controller('coupons')
 export class CouponsController {
   constructor(private readonly couponsService: CouponsService) {}
+
+  @Post('best-public')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get best public coupon for checkout items',
+    description: 'Frontend sends variantId + quantity list, backend returns only best coupon(s). If ties happen, returns tied coupons sorted by nearest expiry.',
+  })
+  @ApiOkResponse({
+    description: 'Best coupon list (usually 1 item; multiple items only when tie on discount)',
+    schema: {
+      example: [
+        {
+          id: 3,
+          code: 'SALE50K',
+          name: 'Giảm 50K',
+          type: 'fixed',
+          value: 50000,
+          minOrderAmount: 500000,
+          maxDiscountAmount: 0,
+          maxUses: 100,
+          usedCount: 10,
+          applicableProduct: null,
+          startDate: '2026-03-01T00:00:00.000Z',
+          endDate: '2026-03-31T23:59:59.000Z',
+          status: 'active',
+          isPublic: true,
+          isActive: true,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-10T10:00:00.000Z',
+        },
+        {
+          id: 7,
+          code: 'FLASH50K',
+          name: 'Flash 50K',
+          type: 'fixed',
+          value: 50000,
+          minOrderAmount: 500000,
+          maxDiscountAmount: 0,
+          maxUses: 100,
+          usedCount: 20,
+          applicableProduct: null,
+          startDate: '2026-03-01T00:00:00.000Z',
+          endDate: '2026-03-25T23:59:59.000Z',
+          status: 'active',
+          isPublic: true,
+          isActive: true,
+          createdAt: '2026-03-02T10:00:00.000Z',
+          updatedAt: '2026-03-10T10:00:00.000Z',
+        },
+      ],
+    },
+  })
+  getBestPublicCoupon(@Body() payload: GetBestPublicCouponDto) {
+    return this.couponsService.getBestPublicCoupon(payload);
+  }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
