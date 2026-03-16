@@ -1,10 +1,12 @@
 import { User } from 'src/entities';
+import { Cart } from 'src/modules/carts/entities';
 import { Role } from 'src/constants/role.enum';
 import { DataSource } from 'typeorm';
 import { hashPassword } from 'src/utils/hash';
 
 export async function seedUsers(dataSource: DataSource): Promise<void> {
   const userRepository = dataSource.getRepository(User);
+  const cartRepository = dataSource.getRepository(Cart);
 
   // Check if users already exist
   const existingCount = await userRepository.count();
@@ -32,6 +34,14 @@ export async function seedUsers(dataSource: DataSource): Promise<void> {
     },
   ];
 
-  await userRepository.save(users);
-  console.log(`✅ Seeded ${users.length} users`);
+  const savedUsers = await userRepository.save(users);
+  console.log(`✅ Seeded ${savedUsers.length} users`);
+
+  // Create cart for each user
+  const carts = savedUsers.map((user) => ({
+    user,
+  }));
+
+  await cartRepository.save(carts);
+  console.log(`✅ Created ${carts.length} carts for users`);
 }
