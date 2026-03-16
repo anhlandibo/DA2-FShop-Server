@@ -6,7 +6,7 @@ import { CreateCouponDto, UpdateCouponDto } from './dtos';
 import { CouponStatus, CouponType } from 'src/constants';
 import { QueryCouponDto } from './dtos/query-coupon.dto';
 import { ProductVariant } from '../products/entities/product-variant.entity';
-import { GetBestPublicCouponDto } from './dtos/best-coupon.dto';
+import { GetBestPublicCouponDto } from './dtos/best-coupon';
 
 @Injectable()
 export class CouponsService {
