@@ -33,7 +33,7 @@ export class ProductsService {
     private categoriesService: CategoriesService,
     private colorsService: ColorsService,
     private sizesService: SizesService,
-  ) {}
+  ) { }
 
   async create(
     createProductDto: CreateProductDto,
@@ -204,31 +204,57 @@ export class ProductsService {
       relations: ['brand', 'category', 'images', 'variants'],
     });
 
-    if (!product) 
+    if (!product)
       throw new HttpException(`Product with id ${id} not found`, HttpStatus.NOT_FOUND);
-    
+
     // Get active variants
     const activeVariants = product.variants?.filter((v) => v.isActive) ?? [];
-    
+
     // Get stock quantities for all variants
     const inventories = activeVariants.length > 0
       ? await this.inventoryRepository.find({
-          where: { variantId: In(activeVariants.map((v) => v.id)) },
-        })
+        where: { variantId: In(activeVariants.map((v) => v.id)) },
+      })
       : [];
 
     const stockByVariant = Object.fromEntries(
       inventories.map((inv) => [inv.variantId, inv.quantity]),
     );
 
-    // Filter images and variants by isActive, add stock quantity
+    // Get sold quantities for all variants
+    const soldByVariant: Record<number, number> = {};
+    if (activeVariants.length > 0) {
+      const variantIds = activeVariants.map((v) => v.id);
+      const soldData = await this.inventoryTransactionRepository.query(
+        `SELECT variant_id, COALESCE(SUM(quantity), 0) AS sold_quantity
+         FROM inventory_transactions
+         WHERE type = $1 AND variant_id = ANY($2)
+         GROUP BY variant_id`,
+        [InventoryType.EXPORT, variantIds],
+      );
+
+      soldData.forEach((row: any) => {
+        soldByVariant[row.variant_id] = parseInt(row.sold_quantity, 10);
+      });
+    }
+
+    const processedVariants = activeVariants.map((v) => ({
+      ...v,
+      stockQuantity: stockByVariant[v.id] ?? 0,
+      soldQuantity: soldByVariant[v.id] ?? 0,
+    }));
+
+    const totalSoldQuantity = processedVariants.reduce(
+      (sum, variant) => sum + (variant.soldQuantity ?? 0),
+      0,
+    );
+
+    // Filter images and variants by isActive, add stock/sold quantity
     return {
       ...product,
       images: product.images?.filter((img) => img.isActive) ?? [],
-      variants: activeVariants.map((v) => ({
-        ...v,
-        stockQuantity: stockByVariant[v.id] ?? 0,
-      })),
+      soldQuantity: totalSoldQuantity,
+      variants: processedVariants,
     };
   }
 
