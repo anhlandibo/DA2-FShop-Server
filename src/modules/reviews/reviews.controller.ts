@@ -35,6 +35,15 @@ export class ReviewsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @Get('me')
+  @ApiOperation({ summary: 'Get my reviews' })
+  findMine(@Req() request: Request, @Query() query: QueryDto) {
+    const { sub } = request['user']
+    return this.reviewsService.findMine(sub, query);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post(':id/vote')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Vote for a review' })

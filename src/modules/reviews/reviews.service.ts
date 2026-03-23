@@ -134,6 +134,42 @@ export class ReviewsService {
     return response;
   }
 
+  async findMine(userId: number, query: QueryDto) {
+    const { page, limit, search, sortBy = 'id', sortOrder = 'DESC' } = query;
+    const sortableFields = new Set(['id', 'rating', 'createdAt', 'updatedAt']);
+    const safeSortBy = sortableFields.has(sortBy) ? sortBy : 'id';
+
+    const queryBuilder = this.reviewRepository
+      .createQueryBuilder('r')
+      .innerJoinAndSelect('r.variant', 'v')
+      .leftJoinAndSelect('v.product', 'p')
+      .leftJoinAndSelect('r.images', 'img')
+      .leftJoinAndSelect('r.votes', 'vote')
+      .where('r.userId = :userId', { userId })
+      .andWhere('r.isActive = :isActive', { isActive: true });
+
+    if (search) {
+      queryBuilder.andWhere('r.comment LIKE :search', { search: `%${search}%` });
+    }
+
+    queryBuilder.orderBy(`r.${safeSortBy}`, sortOrder);
+
+    if (page && limit) {
+      queryBuilder.take(limit).skip((page - 1) * limit);
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      pagination: {
+        total,
+        page,
+        limit,
+      },
+      data,
+    };
+  }
+
   async vote(reviewId: number, userId: number, voteReviewDto: VoteReviewDto) {
     return await this.dataSource.transaction(async (manager) => {
       const user = await manager.findOne(User, { where: { id: userId, isActive: true } });
