@@ -27,6 +27,8 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { PostsModule } from './modules/posts/posts.module';
+import { MinioModule } from './modules/minio/minio.module';
+import { BackupModule } from './modules/backup/backup.module';
 
 @Module({
   imports: [
@@ -58,6 +60,8 @@ import { PostsModule } from './modules/posts/posts.module';
     CouponsModule,
     ReviewsModule,
     PostsModule,
+    MinioModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [
