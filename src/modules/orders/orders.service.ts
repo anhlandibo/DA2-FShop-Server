@@ -55,6 +55,42 @@ export class OrdersService {
     return percentDiscount;
   }
 
+  private getOrderStatusLabel(status: OrderStatus): string {
+    const map: Record<OrderStatus, string> = {
+      [OrderStatus.PENDING]: 'chờ xác nhận',
+      [OrderStatus.CONFIRMED]: 'đã xác nhận',
+      [OrderStatus.PROCESSING]: 'đang xử lý',
+      [OrderStatus.SHIPPED]: 'đang giao',
+      [OrderStatus.DELIVERED]: 'đã giao',
+      [OrderStatus.CANCELED]: 'đã hủy',
+      [OrderStatus.RETURN_REQUESTED]: 'đã yêu cầu trả hàng',
+      [OrderStatus.RETURNED]: 'đã trả hàng',
+      [OrderStatus.REFUNDED]: 'đã hoàn tiền',
+    };
+
+    return map[status] ?? status;
+  }
+
+  private buildOrderStatusNotification(
+    orderId: number,
+    from: OrderStatus,
+    to: OrderStatus,
+    actorRole: ActorRole,
+  ): { title: string; message: string } | null {
+    if (from === to) return null;
+
+    const fromLabel = this.getOrderStatusLabel(from);
+    const toLabel = this.getOrderStatusLabel(to);
+
+    return {
+      title: `Cập nhật đơn hàng #${orderId}`,
+      message:
+        actorRole === 'admin'
+          ? `Đơn hàng #${orderId} đã được cập nhật từ ${fromLabel} sang ${toLabel}.`
+          : `Bạn đã cập nhật đơn hàng #${orderId} từ ${fromLabel} sang ${toLabel}.`,
+    };
+  }
+
   async create(userId: number, createOrderDto: CreateOrderDto) {
     this.logger.log(`Create order start: user=${userId}, address=${createOrderDto.addressId}, items=${createOrderDto.items.length}`);
 
@@ -346,7 +382,9 @@ export class OrdersService {
   }
 
   async updateStatus(orderId: number, next: OrderStatus, actor: { id: number, role: ActorRole, reason?: string }) {
-    return this.dataSource.manager.transaction(async (manager) => {
+    this.logger.log(`Update order status start: order=${orderId}, actor=${actor.id}, role=${actor.role}, target=${next}`);
+
+    const result = await this.dataSource.manager.transaction(async (manager) => {
       const order = await manager.findOne(Order, {
         where: { id: orderId },
         relations: ['items', 'items.variant', 'user'],
@@ -407,8 +445,43 @@ export class OrdersService {
       order.status = next;
       await manager.save(order);
 
-      return { message: 'Order status updated', from: prev, to: next };
-    })
+      return {
+        message: 'Order status updated',
+        from: prev,
+        to: next,
+        userId: order.user.id,
+        orderId: order.id,
+      };
+    });
+
+    this.logger.log(`Update order status committed: order=${result.orderId}, from=${result.from}, to=${result.to}`);
+
+    const notificationPayload = this.buildOrderStatusNotification(
+      result.orderId,
+      result.from,
+      result.to,
+      actor.role,
+    );
+
+    if (notificationPayload) {
+      try {
+        this.logger.log(`Trigger status notification: order=${result.orderId}, user=${result.userId}`);
+        await this.notificationService.create({
+          userId: result.userId,
+          type: NotificationType.ORDER,
+          title: notificationPayload.title,
+          message: notificationPayload.message,
+        });
+        this.logger.log(`Status notification success: order=${result.orderId}, user=${result.userId}`);
+      } catch (error) {
+        this.logger.error(
+          `Status notification failed: order=${result.orderId}, user=${result.userId}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
+    return { message: result.message, from: result.from, to: result.to };
   }
 
   async ensureOrderOwnership(orderId: number, userId: number) {

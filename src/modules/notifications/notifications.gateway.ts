@@ -2,7 +2,7 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import { MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from "@nestjs/websockets";
 import { Socket, Server } from "socket.io";
 
 @WebSocketGateway({cors: { origin: '*' }})
@@ -30,8 +30,9 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       });
 
       // 3. Extract userId from payload
-      const userId = payload?.sub ?? payload?.userId;
-      if (!userId) {
+      const extractedUserId = payload?.sub ?? payload?.userId;
+      const userId = Number(extractedUserId);
+      if (!Number.isFinite(userId) || userId <= 0) {
         this.logger.warn(`Socket ${client.id} token payload missing user id, disconnecting`);
         return client.disconnect();
       }
@@ -48,7 +49,8 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   handleDisconnect(client: Socket) {
-    const userId = client.data?.userId;
+    const userId = Number(client.data?.userId);
+
     this.logger.log(`Socket disconnected: user=${userId ?? 'unknown'}, socket=${client.id}`);
 
     this.server.emit('user-left', {
@@ -59,5 +61,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   sendToUser(userId: number, data: any) {
     this.logger.log(`Emit notification_received: user=${userId}, notificationId=${data?.id ?? 'unknown'}`);
     this.server.to(`user_${userId}`).emit('notification_received', data);
+  }
+
+  broadcast(data: any) {
+    this.logger.log(`Broadcast notification_received: notificationId=${data?.id ?? 'unknown'}`);
+    this.server.emit('notification_received', data);
   }
 }

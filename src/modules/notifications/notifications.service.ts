@@ -1,13 +1,14 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Notification, User } from 'src/entities';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { NotificationGateway } from './notifications.gateway';
 import { CreateNotificationDto, QueryNotificationDto } from './dtos';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private static readonly PUBLIC_NOTIFICATION_BATCH_SIZE = 500;
 
   constructor(
     @InjectRepository(Notification)
@@ -36,6 +37,54 @@ export class NotificationsService {
     this.logger.log(`Notification emitted: id=${savedNoti.id}, user=${userId}`);
     
     return savedNoti;
+  }
+
+  createForBroadcast(payload: Omit<CreateNotificationDto, 'userId'>) {
+    this.notiGateway.broadcast({
+      ...payload,
+      isRead: false,
+      createdAt: new Date(),
+    });
+    this.logger.log(`Broadcast notification emitted: type=${payload.type}`);
+  }
+
+  async createForAllActiveUsers(payload: Omit<CreateNotificationDto, 'userId'>) {
+    let lastUserId = 0;
+    let totalInserted = 0;
+
+    while (true) {
+      const users = await this.userRepository.find({
+        select: { id: true },
+        where: { isActive: true, id: MoreThan(lastUserId) },
+        order: { id: 'ASC' },
+        take: NotificationsService.PUBLIC_NOTIFICATION_BATCH_SIZE,
+      });
+
+      if (!users.length) {
+        break;
+      }
+
+      const notifications = users.map((user) =>
+        this.notificationRepository.create({
+          ...payload,
+          user: { id: user.id },
+          isRead: false,
+        }),
+      );
+
+      await this.notificationRepository.save(notifications, {
+        chunk: NotificationsService.PUBLIC_NOTIFICATION_BATCH_SIZE,
+      });
+
+      totalInserted += notifications.length;
+      lastUserId = users[users.length - 1].id;
+    }
+
+    this.logger.log(
+      `Public notifications persisted: total=${totalInserted}, type=${payload.type}`,
+    );
+
+    return totalInserted;
   }
 
   async getMyNotifications(userId: number, query: QueryNotificationDto) {

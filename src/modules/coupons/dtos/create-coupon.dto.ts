@@ -61,4 +61,14 @@ export class CreateCouponDto {
   @BooleanOptional()
   @ApiProperty({ required: false, example: true, description: 'If true, visible to all users' })
   isPublic?: boolean;
+
+  @Type(() => Number)
+  @IsOptional()
+  @Min(1)
+  @ApiProperty({
+    required: false,
+    example: 123,
+    description: 'Required when isPublic = false to notify a specific user',
+  })
+  targetUserId?: number;
 }

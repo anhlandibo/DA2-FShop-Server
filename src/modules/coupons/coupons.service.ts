@@ -1,15 +1,18 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Coupon, CouponRedemption } from './entities';
 import { CreateCouponDto, UpdateCouponDto } from './dtos';
-import { CouponStatus, CouponType } from 'src/constants';
+import { CouponStatus, CouponType, NotificationType } from 'src/constants';
 import { QueryCouponDto } from './dtos/query-coupon.dto';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { GetBestPublicCouponDto } from './dtos/best-coupon';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CouponsService {
+  private readonly logger = new Logger(CouponsService.name);
+
   constructor(
     @InjectRepository(Coupon)
     private readonly couponRepository: Repository<Coupon>,
@@ -18,6 +21,7 @@ export class CouponsService {
     @InjectRepository(ProductVariant)
     private readonly productVariantRepository: Repository<ProductVariant>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private calculateDiscountAmount(coupon: Coupon, orderAmount: number): number {
@@ -42,7 +46,15 @@ export class CouponsService {
   }
 
   async create(createCouponDto: CreateCouponDto) {
-    return await this.dataSource.transaction(async (manager) => {
+    const isPublic = createCouponDto.isPublic ?? true;
+    if (!isPublic && !createCouponDto.targetUserId) {
+      throw new HttpException(
+        'targetUserId is required when creating a private coupon',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const savedCoupon = await this.dataSource.transaction(async (manager) => {
       // 1. Validate coupon code uniqueness
       const existing = await manager.findOne(Coupon, {
         where: { code: createCouponDto.code },
@@ -106,7 +118,7 @@ export class CouponsService {
         startDate,
         endDate,
         status: createCouponDto.status,
-        isPublic: createCouponDto.isPublic ?? true,
+        isPublic,
         isActive: true,
         usedCount: 0,
       });
@@ -114,6 +126,50 @@ export class CouponsService {
       const savedCoupon = await manager.save(coupon);
       return savedCoupon;
     });
+
+    try {
+      const notificationPayload = {
+        title: `Mã giảm giá mới: ${savedCoupon.code}`,
+        message: savedCoupon.description || 'Đã cập nhật mã giảm giá mới',
+        type: NotificationType.DISCOUNT,
+      };
+
+      if (savedCoupon.isPublic) {
+        this.notificationsService.createForBroadcast(notificationPayload);
+
+        void this.notificationsService
+          .createForAllActiveUsers(notificationPayload)
+          .then((total) => {
+            this.logger.log(
+              `Public coupon notifications persisted: couponId=${savedCoupon.id}, total=${total}`,
+            );
+          })
+          .catch((error: unknown) => {
+            this.logger.error(
+              `Public coupon notifications persist failed: couponId=${savedCoupon.id}, reason=${error instanceof Error ? error.message : 'unknown'}`,
+            );
+          });
+
+        this.logger.log(
+          `Public coupon notification broadcast: couponId=${savedCoupon.id}`,
+        );
+      } else {
+        await this.notificationsService.create({
+          ...notificationPayload,
+          userId: createCouponDto.targetUserId!,
+        });
+        this.logger.log(
+          `Private coupon notification sent: couponId=${savedCoupon.id}, user=${createCouponDto.targetUserId}`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `Coupon notification failed: couponId=${savedCoupon.id}, reason=${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+
+    return savedCoupon;
   }
 
   async getAll(queryCouponDto: QueryCouponDto) {
