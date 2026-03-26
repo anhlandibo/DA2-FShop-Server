@@ -1,15 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AddressesService } from './addresses.service';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiCreatedResponse, ApiNotFoundResponse, ApiResponse } from '@nestjs/swagger';
 import { CreateAddressDto, UpdateAddressDto } from './dtos';
 import { QueryDto } from 'src/dtos/query.dto';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('addresses')
 export class AddressesController {
   constructor(private readonly addressService: AddressesService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Create a new address for the authenticated user'})
@@ -26,7 +26,7 @@ export class AddressesController {
     return this.addressService.findAll(query);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all addresses for the authenticated user' })
@@ -35,7 +35,7 @@ export class AddressesController {
     return this.addressService.getMyAddresses(sub);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update address by ID' })
@@ -45,7 +45,7 @@ export class AddressesController {
     return this.addressService.update(sub, id, updateAddressDto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get(':addressId')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get address by ID' })
@@ -55,7 +55,7 @@ export class AddressesController {
     return this.addressService.getAddressById(sub, addressId);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Patch('/default/:id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Set address as default' })
@@ -66,7 +66,7 @@ export class AddressesController {
     return this.addressService.setDefault(sub, id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Delete address by ID' })

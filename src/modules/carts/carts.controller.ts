@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { CartsService } from './carts.service';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiCreatedResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBearerAuth, ApiBadRequestResponse } from '@nestjs/swagger';
 import { CreateCartDto, CartItemDto } from './dtos';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('carts')
 export class CartsController {
@@ -18,7 +18,7 @@ export class CartsController {
   }
 
   @Post('add')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add item to cart' })
   @ApiNotFoundResponse({description: 'Cart not found or variant not found'})
@@ -29,7 +29,7 @@ export class CartsController {
   }
 
   @Post('remove')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add item to cart' })
   @ApiNotFoundResponse({description: 'Cart not found or cart item not found'})
@@ -39,7 +39,7 @@ export class CartsController {
   }
 
   @Get('/me')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Get cart'})
   @ApiNotFoundResponse({description: 'Cart not found'})

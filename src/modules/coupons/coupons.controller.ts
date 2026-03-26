@@ -1,12 +1,12 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards, Req, Query, Get, Param, Patch, ParseIntPipe, Delete } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto, GetBestPublicCouponDto, UpdateCouponDto } from './dtos';
-import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { Roles } from 'src/decorators/roles.decorator';
 import { Role } from 'src/constants/role.enum';
 import { ApiOperation, ApiBearerAuth, ApiBadRequestResponse, ApiCreatedResponse, ApiConflictResponse, ApiUnauthorizedResponse, ApiNotFoundResponse, ApiOkResponse } from '@nestjs/swagger';
 import { QueryCouponDto } from './dtos/query-coupon.dto';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('coupons')
 export class CouponsController {
@@ -68,7 +68,7 @@ export class CouponsController {
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
@@ -140,7 +140,7 @@ export class CouponsController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()

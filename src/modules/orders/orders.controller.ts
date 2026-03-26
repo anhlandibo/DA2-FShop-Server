@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Body, Controller, Get, HttpException, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiNotFoundResponse, ApiBadRequestResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { CreateOrderDto } from './dtos/create-order.dto';
 import { OrderQueryDto } from 'src/dtos';
@@ -10,13 +9,14 @@ import { OrderStatus, Role } from 'src/constants';
 import { Roles } from 'src/decorators/roles.decorator';
 import { CancelOrderDto, UpdateOrderStatusDto } from './dtos';
 import { ActorRole } from 'src/utils/order-status.rules';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new order for the authenticated user' })
   @ApiNotFoundResponse({
@@ -28,7 +28,7 @@ export class OrdersController {
     return this.ordersService.create(sub, createOrderDto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all orders for the authenticated user' })
@@ -39,14 +39,14 @@ export class OrdersController {
   }
 
   @Get('all')
-  // @UseGuards(AuthGuard('jwt'), RolesGuard)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Get all orders (admin)' })
   getAll(@Query() query: OrderQueryDto) {
     return this.ordersService.getAll(query);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order by ID for the authenticated user' })
   @ApiNotFoundResponse({ description: 'Order not found' })
@@ -55,7 +55,7 @@ export class OrdersController {
   }
 
   // GET ORDER BY ID FOR AUTHENTICATED USER
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('me/:orderId')
   @ApiOperation({ summary: 'Get order by ID for the authenticated user' })
   @ApiNotFoundResponse({ description: 'Order not found' })
@@ -65,9 +65,9 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update order status' })
   @ApiNotFoundResponse({ description: 'Order not found' })
@@ -91,7 +91,7 @@ export class OrdersController {
   }
 
   // CANCEL ORDER
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
   @ApiOperation({
     summary: 'Cancel an order (only PENDING or CONFIRMED orders)',
@@ -121,7 +121,7 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, OrderStatus.CANCELED, actor);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post(':orderId/confirm-delivery')
   @ApiOperation({ summary: 'User confirms receipt of goods' })
   @ApiBearerAuth()

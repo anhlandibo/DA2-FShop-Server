@@ -20,7 +20,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { InventoriesService } from './inventories.service';
 import {
   CreateInventoryDto,
@@ -31,6 +30,7 @@ import { Roles } from 'src/decorators/roles.decorator';
 import { Role } from 'src/constants/role.enum';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { QueryDto } from 'src/dtos';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @ApiTags('Inventories')
 @Controller('inventories')
@@ -41,7 +41,7 @@ export class InventoriesController {
    * Create inventory for a variant
    * @route POST /inventories
    */
-  @Post()  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Post()  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create inventory for a product variant (admin only)' })
@@ -56,7 +56,7 @@ export class InventoriesController {
    * @route GET /inventories
    */
   @Get()
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all inventories (admin only)' })
@@ -70,7 +70,7 @@ export class InventoriesController {
    * @route GET /inventories/low-stock?threshold=10
    */
   @Get('low-stock')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get low stock inventories (admin only)' })
@@ -84,7 +84,7 @@ export class InventoriesController {
    * @route POST /inventories/transactions/create
    */
   @Post('transactions/create')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create inventory transaction (import/export/return/adjustment)' })
@@ -103,7 +103,7 @@ export class InventoriesController {
    * @route GET /inventories/:id
    */
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get inventory by ID (admin only)' })
@@ -117,7 +117,7 @@ export class InventoriesController {
    * @route GET /inventories/variant/:variantId
    */
   @Get('variant/:variantId')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get inventory by variant ID (admin only)' })
@@ -131,7 +131,7 @@ export class InventoriesController {
    * @route PATCH /inventories/:id
    */
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update inventory quantity directly (admin only)' })
@@ -146,7 +146,7 @@ export class InventoriesController {
    * @route GET /inventories/:variantId/transactions
    */
   @Get(':variantId/transactions')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get transaction history for a variant' })
@@ -164,7 +164,7 @@ export class InventoriesController {
    * @route DELETE /inventories/:id
    */
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete inventory (admin only)' })

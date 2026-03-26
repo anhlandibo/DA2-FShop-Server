@@ -1,5 +1,4 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Req, UnauthorizedException, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiNotFoundResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PostsService } from './posts.service';
@@ -12,7 +11,7 @@ import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post()
   @ApiConsumes('multipart/form-data')
@@ -28,7 +27,7 @@ export class PostsController {
     return this.postsService.create(sub, dto, files?.postImages ?? []);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch(':id')
   @ApiConsumes('multipart/form-data')
@@ -45,7 +44,7 @@ export class PostsController {
     return this.postsService.update(id, sub, dto, files?.postImages ?? []);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Soft delete a post (mark as inactive)' })
@@ -113,7 +112,7 @@ export class PostsController {
     return this.postsService.updateComment(commentId, sub, updateCommentDto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Delete(':postId/comments/:commentId')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a comment' })
@@ -124,7 +123,7 @@ export class PostsController {
   }
 
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post(':postId/comments/:commentId/replies')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a reply to a comment' })

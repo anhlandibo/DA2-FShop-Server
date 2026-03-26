@@ -1,17 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
-import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiNotFoundResponse, ApiConsumes } from '@nestjs/swagger';
 import { CreateReviewDto, UpdateReviewDto, VoteReviewDto } from './dtos';
 import { QueryDto } from 'src/dtos';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post()
   @ApiConsumes('multipart/form-data')
@@ -34,7 +34,7 @@ export class ReviewsController {
     return this.reviewsService.findAll(query);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('me')
   @ApiOperation({ summary: 'Get my reviews' })
@@ -43,7 +43,7 @@ export class ReviewsController {
     return this.reviewsService.findMine(sub, query);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post(':id/vote')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Vote for a review' })
@@ -67,7 +67,7 @@ export class ReviewsController {
     return this.reviewsService.getReviewSummary(productId);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
@@ -85,7 +85,7 @@ export class ReviewsController {
     return this.reviewsService.updateReview(id, sub, dto, files.reviewImages ?? []);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a review (soft delete)' })

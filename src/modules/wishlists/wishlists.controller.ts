@@ -1,13 +1,13 @@
 import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { WishlistsService } from './wishlists.service';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CreateWishlistsDto } from './dtos/create-wishlits.dto';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('wishlists')
 export class WishlistsController {
   constructor(private readonly wishlistsService: WishlistsService) { }
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my wishlists' })
@@ -16,7 +16,7 @@ export class WishlistsController {
     return this.wishlistsService.getMyWishlists(sub);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('toggle')
   @ApiOperation({
@@ -31,7 +31,7 @@ export class WishlistsController {
   }
 
   @Delete()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Clear all wishlist items for the authenticated user',
