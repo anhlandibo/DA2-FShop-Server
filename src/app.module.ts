@@ -31,6 +31,7 @@ import { MinioModule } from './modules/minio/minio.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { AiChatbotModule } from './modules/ai-chatbot/ai-chatbot.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ChatsModule } from './modules/chats/chats.module';
     BackupModule,
     NotificationsModule,
     ChatsModule,
+    AiChatbotModule,
   ],
   controllers: [AppController],
   providers: [

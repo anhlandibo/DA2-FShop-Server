@@ -2,16 +2,114 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ImageSearchResultDto, VoiceSearchResponseDto } from '../products/dtos';
 
+export interface AiChatHistoryItem {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiChatProductItem {
+  id: number;
+  name: string;
+  price: number;
+  image_url?: string;
+  category?: string;
+  brand?: string;
+  category_department?: string;
+}
+
+export interface AiChatResponse {
+  answer: string;
+  products: AiChatProductItem[];
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly aiServiceUrl: string;
+  private readonly aiChatTimeoutMs: number;
 
   constructor(private readonly configService: ConfigService) {
     this.aiServiceUrl =
       this.configService.get<string>('AI_SERVICE_URL') ||
       this.configService.get<string>('AI_SERVER_URL') ||
       'http://localhost:8000';
+
+    const configuredTimeout = Number(this.configService.get<string>('AI_CHAT_TIMEOUT_MS') || '45000');
+    this.aiChatTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 45000;
+  }
+
+  async askChatbot(
+    question: string,
+    history: AiChatHistoryItem[],
+    userId: number,
+  ): Promise<AiChatResponse> {
+    const normalizedQuestion = question.trim();
+    if (!normalizedQuestion) {
+      throw new HttpException('Question is required', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      this.logger.debug(`Sending chatbot request to AI service: ${this.aiServiceUrl}/chat/ask`);
+
+      const response = await fetch(`${this.aiServiceUrl}/chat/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: normalizedQuestion,
+          history,
+          user_id: userId,
+        }),
+        signal: AbortSignal.timeout(this.aiChatTimeoutMs),
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI service returned status ${response.status}`);
+      }
+
+      const raw = (await response.json()) as {
+        answer?: unknown;
+        products?: unknown;
+      };
+
+      const answer = typeof raw.answer === 'string'
+        ? raw.answer
+        : 'He thong dang ban, vui long thu lai sau.';
+
+      const products = Array.isArray(raw.products)
+        ? (raw.products as AiChatProductItem[])
+        : [];
+
+      return {
+        answer,
+        products,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Chatbot request failed: ${errorMessage}`);
+
+      if (errorMessage.includes('timeout')) {
+        throw new HttpException(
+          'Chatbot timeout. Please try again in a moment.',
+          HttpStatus.GATEWAY_TIMEOUT,
+        );
+      }
+
+      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')) {
+        throw new HttpException(
+          'AI chatbot service is currently unavailable. Please try again later.',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
+      throw new HttpException(
+        'Failed to get chatbot response. Please try again.',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
   }
 
   async searchByImage(

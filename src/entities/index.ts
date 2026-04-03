@@ -24,3 +24,4 @@ export { Post, PostComment, PostImage, PostLike, Hashtag, PostHashtag } from '..
 export { Notification } from '../modules/notifications/entities/notification.entity';
 export { Conversation } from '../modules/chats/entities/conversation.entity';
 export { Message } from '../modules/chats/entities/message.entity';
+export { AiChatSession, AiChatMessage } from '../modules/ai-chatbot/entities';

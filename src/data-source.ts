@@ -33,6 +33,8 @@ import {
   Notification,
   Conversation,
   Message,
+  AiChatSession,
+  AiChatMessage,
 } from './entities';
 
 /**
@@ -80,6 +82,8 @@ export const AppDataSource = new DataSource({
     Notification,
     Conversation,
     Message,
+    AiChatSession,
+    AiChatMessage,
   ],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
