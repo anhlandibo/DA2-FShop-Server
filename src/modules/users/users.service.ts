@@ -168,6 +168,109 @@ export class UsersService {
     return this.usersRepository.save(existingUser);
   }
 
+  async findByGoogleId(googleId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { googleId, isActive: true },
+    });
+    if (!user) throw new HttpException('Not found user', HttpStatus.NOT_FOUND);
+    return user;
+  }
+
+  async createGoogleUser(data: {
+    email: string;
+    fullName: string;
+    avatar?: string;
+    googleId: string;
+  }) {
+    const existingUser = await this.usersRepository.findOne({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new HttpException('Email already exists', HttpStatus.CONFLICT);
+    }
+
+    // Generate a random password for Google users (they won't use it)
+    const randomPassword = await hashPassword(
+      Math.random().toString(36).slice(-16),
+    );
+
+    const user = this.usersRepository.create({
+      email: data.email,
+      fullName: data.fullName,
+      avatar: data.avatar,
+      googleId: data.googleId,
+      password: randomPassword,
+      isVerified: true, // Google users are pre-verified
+      isActive: true,
+    });
+
+    await this.usersRepository.save(user);
+    await this.cartService.create({ userId: user.id });
+    return user;
+  }
+
+  async linkGoogleAccount(userId: number, googleId: string): Promise<User> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId, isActive: true },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (user.googleId) {
+      throw new HttpException(
+        'Google account already linked',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if this Google ID is already used by another user
+    const existingLink = await this.usersRepository.findOne({
+      where: { googleId },
+    });
+
+    if (existingLink && existingLink.id !== userId) {
+      throw new HttpException(
+        'This Google account is already linked to another user',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    user.googleId = googleId;
+    return this.usersRepository.save(user);
+  }
+
+  async unlinkGoogleAccount(userId: number): Promise<User> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId, isActive: true },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (!user.googleId) {
+      throw new HttpException(
+        'Google account not linked',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if user has password (fallback auth method)
+    // If googleId is their only auth method, prevent unlinking
+    if (!user.password || user.password === '') {
+      throw new HttpException(
+        'Cannot unlink Google as it is your only authentication method. Please set a password first.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    user.googleId = null;
+    return this.usersRepository.save(user);
+  }
+
   async remove(id: number) {
     const user = await this.usersRepository.findOne({
       where: { id, isActive: true },

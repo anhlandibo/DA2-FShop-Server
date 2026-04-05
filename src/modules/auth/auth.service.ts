@@ -7,9 +7,10 @@ import Redis from 'ioredis';
 import { UsersService } from '../users/users.service';
 import { comparePassword, hashPassword } from 'src/utils/hash';
 import { Role } from 'src/constants/role.enum';
-import { LoginDto } from './dtos/login.dto';
+import { LoginDto, GoogleLoginDto } from './dtos';
 import { ChangePasswordDto } from './dtos/change-password.dto';
 import { UpdateMeDto } from './dtos/update-me.dto';
+import { GoogleOAuthUtil, GoogleProfile } from 'src/utils/google-oauth.util';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRedis() private readonly redis: Redis,
     private readonly configService: ConfigService,
+    private readonly googleOAuthUtil: GoogleOAuthUtil,
   ) {}
 
   private generateAccessToken(userId: number, email: string, role: Role, cartId?: number): string {
@@ -55,6 +57,57 @@ export class AuthService {
     }
 
     // Get user's cart
+    const userWithCart = await this.usersService.findByIdWithCart(user.id);
+    const cartId = userWithCart?.cart?.id;
+
+    const accessToken = this.generateAccessToken(user.id, user.email, user.role, cartId);
+    const refreshToken = this.generateRefreshToken(user.id, user.email, user.role, cartId);
+
+    const refreshExpirySeconds = this.configService.get<number>('JWT_REFRESH_EXPIRATION_SECONDS', 604800);
+    await this.redis.set(`refresh_token:${user.id}`, refreshToken, 'EX', refreshExpirySeconds);
+
+    const { password: _password, publicId: _publicId, ...userInfo } = user;
+    return { accessToken, refreshToken, user: userInfo };
+  }
+
+  async loginWithGoogle(googleLoginDto: GoogleLoginDto) {
+    // 1. Verify Google token
+    let googleProfile: GoogleProfile;
+    try {
+      googleProfile = await this.googleOAuthUtil.verifyToken(googleLoginDto.idToken);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid Google token';
+      throw new HttpException(message, HttpStatus.UNAUTHORIZED);
+    }
+
+    // 2. Check if user exists with this Google ID
+    let user = await this.usersService.findByGoogleId(googleProfile.id).catch(() => null);
+
+    // 3. If user doesn't exist, check if email exists
+    if (!user) {
+      const existingUser = await this.usersService.findByEmail(googleProfile.email).catch(() => null);
+      if (existingUser && !existingUser.googleId) {
+        // Email exists but not linked to Google - user must explicitly link
+        throw new HttpException(
+          'Email already registered. Please link your Google account in settings or login with email/password',
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // 4. Create new user if this is first Google login
+      user = await this.usersService.createGoogleUser({
+        email: googleProfile.email,
+        fullName: googleProfile.name,
+        avatar: googleProfile.picture,
+        googleId: googleProfile.id,
+      });
+    }
+
+    if (!user.isActive) {
+      throw new HttpException('User account is inactive', HttpStatus.FORBIDDEN);
+    }
+
+    // 5. Generate tokens
     const userWithCart = await this.usersService.findByIdWithCart(user.id);
     const cartId = userWithCart?.cart?.id;
 
@@ -145,5 +198,31 @@ export class AuthService {
 
   getCookieOptions() {
     return this.getRefreshCookieOptions();
+  }
+
+  async linkGoogleAccount(userId: number, idToken: string) {
+    // 1. Verify Google token
+    let googleProfile: GoogleProfile;
+    try {
+      googleProfile = await this.googleOAuthUtil.verifyToken(idToken);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid Google token';
+      throw new HttpException(message, HttpStatus.UNAUTHORIZED);
+    }
+
+    // 2. Link the account
+    const updatedUser = await this.usersService.linkGoogleAccount(
+      userId,
+      googleProfile.id,
+    );
+
+    const { password: _password, publicId: _publicId, ...userInfo } = updatedUser;
+    return userInfo;
+  }
+
+  async unlinkGoogleAccount(userId: number) {
+    const updatedUser = await this.usersService.unlinkGoogleAccount(userId);
+    const { password: _password, publicId: _publicId, ...userInfo } = updatedUser;
+    return userInfo;
   }
 }

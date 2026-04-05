@@ -1,6 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpException,
@@ -21,7 +25,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto, UpdateMeDto } from './dtos';
+import { ChangePasswordDto, GoogleLoginDto, LinkGoogleDto, LoginDto, UpdateMeDto } from './dtos';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/decorators/current-user.decorator';
 import type { JwtPayload } from 'src/strategies/jwt.strategy';
@@ -73,6 +77,48 @@ export class AuthController {
     await this.authService.logout(user.sub);
     res.clearCookie('refresh_token');
     return { message: 'Logged out', timestamp: new Date().toISOString() };
+  }
+
+  @Post('google/login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Login or sign up with Google — auto-creates account if email not exists; returns access token; sets refresh token in HttpOnly cookie',
+  })
+  async loginWithGoogle(
+    @Body() googleLoginDto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.loginWithGoogle(googleLoginDto);
+    res.cookie('refresh_token', result.refreshToken, this.authService.getCookieOptions());
+    const { refreshToken: _rt, ...responseData } = result;
+    return responseData;
+  }
+
+  @Post('google/link')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Link Google account to existing user account' })
+  async linkGoogleAccount(
+    @CurrentUser() user: JwtPayload,
+    @Body() linkGoogleDto: LinkGoogleDto,
+  ) {
+    const userInfo = await this.authService.linkGoogleAccount(
+      user.sub,
+      linkGoogleDto.idToken,
+    );
+    return { message: 'Google account linked successfully', user: userInfo };
+  }
+
+  @Delete('google/unlink')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unlink Google account from user account' })
+  async unlinkGoogleAccount(@CurrentUser() user: JwtPayload) {
+    const userInfo = await this.authService.unlinkGoogleAccount(user.sub);
+    return { message: 'Google account unlinked successfully', user: userInfo };
   }
 
   @Get('me')
